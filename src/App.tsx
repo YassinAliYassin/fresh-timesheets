@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import TimesheetForm from './components/TimesheetForm';
 import EventManager from './components/EventManager';
 import BillingExport from './components/BillingExport';
+import Reports from './components/Reports';
 
 function App() {
   const [user, setUser] = useState<any>(null);
@@ -48,6 +49,7 @@ function App() {
             <Route path="/timesheet" element={user ? <TimesheetForm /> : <Navigate to="/login" />} />
             <Route path="/events" element={user ? <EventManager /> : <Navigate to="/login" />} />
             <Route path="/billing" element={user ? <BillingExport /> : <Navigate to="/login" />} />
+            <Route path="/reports" element={user ? <Reports /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>
