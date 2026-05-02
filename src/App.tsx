@@ -6,6 +6,7 @@ import TimesheetForm from './components/TimesheetForm';
 import EventManager from './components/EventManager';
 import BillingExport from './components/BillingExport';
 import Reports from './components/Reports';
+import EmailNotifications from './components/EmailNotifications';
 import useDarkMode from './hooks/useDarkMode';
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
             <Route path="/events" element={user ? <EventManager /> : <Navigate to="/login" />} />
             <Route path="/billing" element={user ? <BillingExport /> : <Navigate to="/login" />} />
             <Route path="/reports" element={user ? <Reports /> : <Navigate to="/login" />} />
+            <Route path="/notifications" element={user ? <EmailNotifications /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>
