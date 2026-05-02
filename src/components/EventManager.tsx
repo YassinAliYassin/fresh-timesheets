@@ -1,3 +1,4 @@
+import API_URL from './api';
 import { useState, useEffect } from 'react';
 
 export default function EventManager() {
@@ -16,7 +17,7 @@ export default function EventManager() {
 
   const fetchEvents = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch('/api/events', {
+    const res = await fetch(`${API_URL}/api/events`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
@@ -28,7 +29,7 @@ export default function EventManager() {
     const token = localStorage.getItem('token');
 
     try {
-      const res = await fetch('/api/events', {
+      const res = await fetch(`${API_URL}/api/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

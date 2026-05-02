@@ -1,3 +1,4 @@
+import API_URL from './api';
 import { useState } from 'react';
 
 export default function BillingExport() {
@@ -16,7 +17,7 @@ export default function BillingExport() {
       });
       if (staffName) params.append('staff_name', staffName);
 
-      const res = await fetch(`/api/billing/cycle?date=${year}-${month.toString().padStart(2, '0')}-01`, {
+      const res = await fetch(`${API_URL}/api/billing/cycle?date=${year}-${month.toString().padStart(2, '0')}-01`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -35,7 +36,7 @@ export default function BillingExport() {
     if (staffName) params.append('staff_name', staffName);
 
     try {
-      const res = await fetch(`/api/export/billing?${params}`, {
+      const res = await fetch(`${API_URL}/api/export/billing?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

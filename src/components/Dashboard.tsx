@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import API_URL from './api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -16,12 +17,12 @@ export default function Dashboard() {
     const token = localStorage.getItem('token');
     
     try {
-      const eventsRes = await fetch('/api/events', {
+      const eventsRes = await fetch(`${API_URL}/api/events`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const events = await eventsRes.json();
 
-      const timesheetsRes = await fetch('/api/timesheets', {
+      const timesheetsRes = await fetch(`${API_URL}/api/timesheets`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const timesheets = await timesheetsRes.json();

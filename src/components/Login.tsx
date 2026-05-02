@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_URL from './api';
 
 export default function Login({ setUser }: { setUser: (user: any) => void }) {
   const [username, setUsername] = useState('');
@@ -13,7 +14,7 @@ export default function Login({ setUser }: { setUser: (user: any) => void }) {
     setError('');
 
     try {
-      const endpoint = isLogin ? '/api/login' : '/api/register';
+      const endpoint = isLogin ? `${API_URL}/api/login` : `${API_URL}/api/register`;
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

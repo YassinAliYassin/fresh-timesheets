@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
+import API_URL from './api';
 
 export default function TimesheetForm() {
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState('');
   const [staffName, setStaffName] = useState('');
   const [clockIn, setClockIn] = useState('');
-  const [activeTimesheets, setActiveTimesheets] = useState([]);
+  const [activeTimesheets, setActiveTimesheets] = useState<any[]>([]);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -15,7 +16,7 @@ export default function TimesheetForm() {
 
   const fetchEvents = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch('/api/events', {
+    const res = await fetch(`${API_URL}/api/events`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
@@ -24,7 +25,7 @@ export default function TimesheetForm() {
 
   const fetchActiveTimesheets = async () => {
     const token = localStorage.getItem('token');
-    const res = await fetch('/api/timesheets?clock_out=', {
+    const res = await fetch(`${API_URL}/api/timesheets?clock_out=`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
@@ -36,7 +37,7 @@ export default function TimesheetForm() {
     const token = localStorage.getItem('token');
     
     try {
-      await fetch('/api/timesheets/clock-in', {
+      await fetch(`${API_URL}/api/timesheets/clock-in`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ export default function TimesheetForm() {
     const token = localStorage.getItem('token');
     
     try {
-      const response = await fetch('/api/timesheets/clock-out', {
+      const response = await fetch(`${API_URL}/api/timesheets/clock-out`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
