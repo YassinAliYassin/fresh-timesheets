@@ -8,6 +8,8 @@ export default function TimesheetForm() {
   const [clockIn, setClockIn] = useState('');
   const [activeTimesheets, setActiveTimesheets] = useState<any[]>([]);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchEvents();
@@ -15,29 +17,46 @@ export default function TimesheetForm() {
   }, []);
 
   const fetchEvents = async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/events`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setEvents(data);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/events`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch events');
+      const data = await res.json();
+      setEvents(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   const fetchActiveTimesheets = async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/api/timesheets?clock_out=`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setActiveTimesheets(data.filter((t: any) => !t.clock_out));
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/timesheets?clock_out=`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch timesheets');
+      const data = await res.json();
+      setActiveTimesheets(data.filter((t: any) => !t.clock_out));
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   const handleClockIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
+    if (!selectedEvent || !staffName) {
+      setError('Please select an event and enter staff name');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
     
     try {
-      await fetch(`${API_URL}/api/timesheets/clock-in`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/timesheets/clock-in`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,18 +69,26 @@ export default function TimesheetForm() {
         })
       });
 
-      setMessage(`✅ ${staffName} clocked in!`);
+      if (!response.ok) throw new Error('Clock in failed');
+
+      setMessage(`✅ ${staffName} clocked in successfully!`);
       setStaffName('');
+      setSelectedEvent('');
+      setClockIn('');
       fetchActiveTimesheets();
-    } catch (err) {
-      setMessage('❌ Clock in failed');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClockOut = async (timesheetId: number) => {
-    const token = localStorage.getItem('token');
+  const handleClockOut = async (timesheetId: number, staffName: string) => {
+    setLoading(true);
+    setError('');
     
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/timesheets/clock-out`, {
         method: 'POST',
         headers: {
@@ -74,11 +101,15 @@ export default function TimesheetForm() {
         })
       });
 
+      if (!response.ok) throw new Error('Clock out failed');
+
       const data = await response.json();
-      setMessage(`✅ Clocked out! Hours: ${data.total_hours}, Amount: R${data.total_amount}`);
+      setMessage(`✅ ${staffName} clocked out! Hours: ${data.total_hours}, Amount: R${data.total_amount}`);
       fetchActiveTimesheets();
-    } catch (err) {
-      setMessage('❌ Clock out failed');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,8 +117,14 @@ export default function TimesheetForm() {
     <div>
       <h2 className="text-3xl font-bold mb-8">Clock In / Clock Out</h2>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+          ❌ {error}
+        </div>
+      )}
+
       {message && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-6">
           {message}
         </div>
       )}
@@ -102,10 +139,10 @@ export default function TimesheetForm() {
               <select
                 value={selectedEvent}
                 onChange={(e) => setSelectedEvent(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#a4c71d] outline-none"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
                 required
               >
-                <option value="">Choose event...</option>
+                <option value="">Choose an event...</option>
                 {events.map((event: any) => (
                   <option key={event.id} value={event.id}>
                     {event.client_name} - {event.venue}
@@ -121,58 +158,60 @@ export default function TimesheetForm() {
                 value={staffName}
                 onChange={(e) => setStaffName(e.target.value)}
                 placeholder="Enter staff name"
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#a4c71d] outline-none"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Clock In Time (optional)</label>
+              <label className="block text-sm font-medium mb-2">Clock In Time</label>
               <input
                 type="datetime-local"
                 value={clockIn}
                 onChange={(e) => setClockIn(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#a4c71d] outline-none"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-[#a4c71d] text-white py-3 rounded-lg font-bold hover:bg-[#8fb018] transition"
+              disabled={loading}
+              className="w-full bg-[#a4c71d] text-white py-3 rounded-lg hover:bg-[#8fb018] transition disabled:opacity-50 font-bold"
             >
-              Clock In
+              {loading ? 'Clocking In...' : 'Clock In'}
             </button>
           </form>
         </div>
 
         {/* Active Timesheets */}
         <div className="bg-white p-6 rounded-2xl shadow-lg">
-          <h3 className="text-xl font-bold mb-4">Pending Clock-Outs</h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {activeTimesheets.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No pending clock-outs</p>
-            ) : (
-              activeTimesheets.map((ts: any) => (
-                <div key={ts.id} className="border p-4 rounded-lg bg-gray-50">
-                  <div className="flex justify-between items-start">
+          <h3 className="text-xl font-bold mb-4">Active Timesheets</h3>
+          {activeTimesheets.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No active timesheets</p>
+          ) : (
+            <div className="space-y-4">
+              {activeTimesheets.map((ts: any) => (
+                <div key={ts.id} className="border border-gray-200 p-4 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-bold">{ts.staff_name}</p>
-                      <p className="text-sm text-gray-600">{ts.client_name} - {ts.venue}</p>
-                      <p className="text-xs text-gray-500">
-                        In: {new Date(ts.clock_in).toLocaleString()}
+                      <p className="text-sm text-gray-600">Event: {ts.event_id}</p>
+                      <p className="text-sm text-gray-600">
+                        Clock In: {new Date(ts.clock_in).toLocaleString()}
                       </p>
                     </div>
                     <button
-                      onClick={() => handleClockOut(ts.id)}
-                      className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm"
+                      onClick={() => handleClockOut(ts.id, ts.staff_name)}
+                      disabled={loading}
+                      className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition disabled:opacity-50"
                     >
                       Clock Out
                     </button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
