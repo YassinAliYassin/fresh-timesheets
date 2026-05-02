@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import API_URL from './api';
+import PDFExport from './PDFExport';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -115,6 +116,10 @@ export default function Dashboard() {
           <h3 className="text-xl font-bold text-[#a4c71d]">Rate: R40/hour</h3>
           <p className="text-sm mt-2 text-gray-600">Standard billing rate</p>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <PDFExport />
       </div>
     </div>
   );
