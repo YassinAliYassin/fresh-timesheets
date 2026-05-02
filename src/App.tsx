@@ -6,9 +6,11 @@ import TimesheetForm from './components/TimesheetForm';
 import EventManager from './components/EventManager';
 import BillingExport from './components/BillingExport';
 import Reports from './components/Reports';
+import useDarkMode from './hooks/useDarkMode';
 
 function App() {
   const [user, setUser] = useState<any>(null);
+  const { isDark, toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -28,6 +30,13 @@ function App() {
           </h1>
           {user && (
             <div className="flex gap-4 items-center">
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+                title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {isDark ? '☀️' : '🌙'}
+              </button>
               <span className="text-sm">{user.username} ({user.role})</span>
               <button
                 onClick={() => {
