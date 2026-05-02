@@ -1,0 +1,202 @@
+import { useState, useEffect } from 'react';
+import api from './api';
+import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+
+export default function CalendarView() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [timesheets, setTimesheets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [dayEntries, setDayEntries] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchTimesheets();
+  }, [currentDate]);
+
+  const fetchTimesheets = async () => {
+    setLoading(true);
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const res = await api.get(`/api/timesheets?month=${year}-${month.toString().padStart(2, '0')}`);
+      setTimesheets(res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch timesheets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getDaysInMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return new Date(year, month, 1).getDay();
+  };
+
+  const hasEntry = (day: any) => {
+    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    return timesheets.some(t => t.date === dateStr);
+  };
+
+  const getDayEntries = (day: any) => {
+    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    return timesheets.filter(t => t.date === dateStr);
+  };
+
+  const handleDayClick = (day: any) => {
+    const entries = getDayEntries(day);
+    setSelectedDate(day);
+    setDayEntries(entries);
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setSelectedDate(null);
+    setDayEntries([]);
+  };
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setSelectedDate(null);
+    setDayEntries([]);
+  };
+
+  const daysInMonth = getDaysInMonth();
+  const firstDay = getFirstDayOfMonth();
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Calendar View</h1>
+        <p className="text-gray-600">Visualize your timesheet entries by date</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={prevMonth}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </h2>
+            <button
+              onClick={nextMonth}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          {/* Day Names */}
+          <div className="grid grid-cols-7 gap-2 mb-2">
+            {dayNames.map(day => (
+              <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7 gap-2">
+            {/* Empty cells for days before month starts */}
+            {[...Array(firstDay)].map((_, i) => (
+              <div key={`empty-${i}`} className="h-20 rounded-lg" />
+            ))}
+
+            {/* Days of the month */}
+            {[...Array(daysInMonth)].map((_, i) => {
+              const day = i + 1;
+              const hasEntries = hasEntry(day);
+              const isSelected = selectedDate === day;
+              const isToday = new Date().getDate() === day && 
+                            new Date().getMonth() === currentDate.getMonth() &&
+                            new Date().getFullYear() === currentDate.getFullYear();
+
+              return (
+                <button
+                  key={day}
+                  onClick={() => handleDayClick(day)}
+                  className={`h-20 rounded-lg border transition-all ${
+                    isSelected
+                      ? 'border-[#a4c71d] bg-[#a4c71d]/10'
+                      : hasEntries
+                      ? 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  } ${isToday ? 'ring-2 ring-[#a4c71d]' : ''}`}
+                >
+                  <div className="p-1">
+                    <div className={`text-sm font-medium mb-1 ${
+                      isToday ? 'text-[#a4c71d] font-bold' : 'text-gray-700'
+                    }`}>
+                      {day}
+                    </div>
+                    {hasEntries && (
+                      <div className="flex items-center gap-1">
+                        <Clock size={10} className="text-blue-600" />
+                        <span className="text-xs text-blue-600">Entry</span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Day Details Sidebar */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {selectedDate 
+              ? `${selectedDate} ${monthNames[currentDate.getMonth()]} Details`
+              : 'Select a Date'
+            }
+          </h3>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : selectedDate ? (
+            dayEntries.length > 0 ? (
+              <div className="space-y-3">
+                {dayEntries.map((entry, i) => (
+                  <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                    <p className="font-medium text-gray-900">{entry.staffName}</p>
+                    <p className="text-sm text-gray-600">{entry.eventName}</p>
+                    <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                      <Clock size={12} />
+                      {entry.hours} hours
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-3 border-t">
+                  <p className="text-sm font-medium text-gray-900">
+                    Total: {dayEntries.reduce((sum, e) => sum + e.hours, 0)} hours
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No entries for this date.</p>
+            )
+          ) : (
+            <p className="text-gray-500 text-sm">Click on a date to view timesheet entries.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

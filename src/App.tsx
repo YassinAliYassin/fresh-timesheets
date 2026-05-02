@@ -7,6 +7,7 @@ import EventManager from './components/EventManager';
 import BillingExport from './components/BillingExport';
 import Reports from './components/Reports';
 import EmailNotifications from './components/EmailNotifications';
+import CalendarView from './components/CalendarView';
 import useDarkMode from './hooks/useDarkMode';
 
 function App() {
@@ -61,6 +62,7 @@ function App() {
             <Route path="/billing" element={user ? <BillingExport /> : <Navigate to="/login" />} />
             <Route path="/reports" element={user ? <Reports /> : <Navigate to="/login" />} />
             <Route path="/notifications" element={user ? <EmailNotifications /> : <Navigate to="/login" />} />
+            <Route path="/calendar" element={user ? <CalendarView /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>
