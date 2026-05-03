@@ -67,17 +67,18 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       
-      CREATE TABLE IF NOT EXISTS timesheets (
-        id SERIAL PRIMARY KEY,
-        event_id INTEGER NOT NULL,
-        staff_name TEXT NOT NULL,
-        clock_in TIMESTAMP NOT NULL,
-        clock_out TIMESTAMP,
-        hourly_rate REAL DEFAULT 40.0,
-        total_hours REAL,
-        total_amount REAL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+        CREATE TABLE IF NOT EXISTS timesheets (
+          id SERIAL PRIMARY KEY,
+          event_id INTEGER,
+          event_name TEXT NOT NULL,
+          staff_name TEXT NOT NULL,
+          clock_in TIMESTAMP NOT NULL,
+          clock_out TIMESTAMP,
+          hourly_rate REAL DEFAULT 40.0,
+          total_hours REAL,
+          total_amount REAL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     `);
   } else {
     db.exec(`
@@ -103,7 +104,8 @@ async function initDb() {
       
       CREATE TABLE IF NOT EXISTS timesheets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_id INTEGER NOT NULL,
+        event_id INTEGER,
+        event_name TEXT NOT NULL,
         staff_name TEXT NOT NULL,
         clock_in DATETIME NOT NULL,
         clock_out DATETIME,
@@ -348,18 +350,30 @@ app.delete('/api/events/:id', authMiddleware, async (req, res) => {
 // Timesheet routes
 app.post('/api/timesheets/clock-in', authMiddleware, async (req, res) => {
   try {
-    const { event_id, staff_name, clock_in } = req.body;
+    const { event_name, staff_name, staff_names, clock_in } = req.body;
     
-    if (!event_id || !staff_name) {
-      return res.status(400).json({ error: 'Missing required field: event_id or staff_name' });
+    if (!event_name || (!staff_name && !staff_names)) {
+      return res.status(400).json({ error: 'Missing required field: event_name and staff_name/staff_names' });
     }
     
-    const result = await dbQuery(
-      'INSERT INTO timesheets (event_id, staff_name, clock_in) VALUES (?, ?, ?)',
-      [event_id, staff_name, clock_in || new Date().toISOString()]
-    );
+    const clockInTime = clock_in || new Date().toISOString();
+    const results = [];
     
-    res.json({ id: result[0].id, message: 'Clocked in successfully' });
+    // Handle group clock in (array of staff names)
+    const names = staff_names && Array.isArray(staff_names) ? staff_names : [staff_name];
+    
+    for (const name of names) {
+      const result = await dbQuery(
+        'INSERT INTO timesheets (event_name, staff_name, clock_in) VALUES (?, ?, ?)',
+        [event_name, name, clockInTime]
+      );
+      results.push({ id: result[0].id, staff_name: name });
+    }
+    
+    res.json({ 
+      message: `Clocked in ${results.length} staff successfully`, 
+      records: results 
+    });
   } catch (err) {
     console.error('Clock in error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -397,21 +411,31 @@ app.post('/api/timesheets/clock-out', authMiddleware, async (req, res) => {
   }
 });
 
+// Get unique event names for previous events
+app.get('/api/events/names', authMiddleware, async (req, res) => {
+  try {
+    const names = await dbQuery('SELECT DISTINCT event_name FROM timesheets WHERE event_name IS NOT NULL ORDER BY event_name ASC');
+    res.json(names.map(n => n.event_name));
+  } catch (err) {
+    console.error('Get event names error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/timesheets', authMiddleware, async (req, res) => {
   try {
-    const { event_id, staff_name, month, year } = req.query;
+    const { event_name, staff_name, month, year } = req.query;
     
     let query = `
-      SELECT t.*, e.client_name, e.venue, e.event_date 
+      SELECT t.* 
       FROM timesheets t 
-      JOIN events e ON t.event_id = e.id 
       WHERE 1=1
     `;
     const params = [];
     
-    if (event_id) {
-      query += ' AND t.event_id = ?';
-      params.push(event_id);
+    if (event_name) {
+      query += ' AND t.event_name LIKE ?';
+      params.push(`%${event_name}%`);
     }
     
     if (staff_name) {
@@ -543,10 +567,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', database: isPostgres ? 'postgres' : 'sqlite', timestamp: new Date().toISOString() });
 });
 
-// SPA catch-all
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
+// SPA catch-all - DISABLED FOR DEBUGGING
+// app.get('/*', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// });
 
 app.listen(PORT, () => {
   console.log(`🚀 Fresh Timesheets API running on port ${PORT}`);

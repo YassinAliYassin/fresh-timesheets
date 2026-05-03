@@ -4,6 +4,9 @@ import API_URL from './api';
 export default function TimesheetForm() {
   const [eventName, setEventName] = useState('');
   const [staffName, setStaffName] = useState('');
+  const [groupStaffNames, setGroupStaffNames] = useState('');
+  const [isGroupClockIn, setIsGroupClockIn] = useState(false);
+  const [previousEvents, setPreviousEvents] = useState<string[]>([]);
   const [clockIn, setClockIn] = useState('');
   const [activeTimesheets, setActiveTimesheets] = useState<any[]>([]);
   const [message, setMessage] = useState('');
@@ -11,8 +14,23 @@ export default function TimesheetForm() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    fetchPreviousEvents();
     fetchActiveTimesheets();
   }, []);
+
+  const fetchPreviousEvents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/events/names`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch previous events');
+      const data = await res.json();
+      setPreviousEvents(data);
+    } catch (err: any) {
+      console.error('Fetch previous events error:', err.message);
+    }
+  };
 
   const fetchActiveTimesheets = async () => {
     try {
@@ -30,9 +48,30 @@ export default function TimesheetForm() {
 
   const handleClockIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventName || !staffName) {
-      setError('Please enter an event name and staff name');
+    
+    // Validation
+    if (!eventName) {
+      setError('Please enter an event name');
       return;
+    }
+    
+    let staffNames: string[] = [];
+    if (isGroupClockIn) {
+      if (!groupStaffNames.trim()) {
+        setError('Please enter staff names (comma-separated)');
+        return;
+      }
+      staffNames = groupStaffNames.split(',').map(n => n.trim()).filter(n => n.length > 0);
+      if (staffNames.length === 0) {
+        setError('Please enter valid staff names');
+        return;
+      }
+    } else {
+      if (!staffName.trim()) {
+        setError('Please enter a staff name');
+        return;
+      }
+      staffNames = [staffName.trim()];
     }
 
     setLoading(true);
@@ -40,23 +79,39 @@ export default function TimesheetForm() {
     
     try {
       const token = localStorage.getItem('token');
+      const payload: any = {
+        event_name: eventName,
+        clock_in: clockIn || new Date().toISOString()
+      };
+      
+      if (isGroupClockIn) {
+        payload.staff_names = staffNames;
+      } else {
+        payload.staff_name = staffNames[0];
+      }
+      
       const response = await fetch(`${API_URL}/api/timesheets/clock-in`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          event_name: eventName,
-          staff_name: staffName,
-          clock_in: clockIn || new Date().toISOString()
-        })
+        body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error('Clock in failed');
-
-      setMessage(`✅ ${staffName} clocked in successfully!`);
-      setStaffName('');
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Clock in failed');
+      }
+      
+      if (isGroupClockIn) {
+        setMessage(`✅ Clocked in ${staffNames.length} staff successfully!`);
+        setGroupStaffNames('');
+      } else {
+        setMessage(`✅ ${staffNames[0]} clocked in successfully!`);
+        setStaffName('');
+      }
+      
       setEventName('');
       setClockIn('');
       fetchActiveTimesheets();
@@ -119,7 +174,7 @@ export default function TimesheetForm() {
           <h3 className="text-xl font-bold mb-4">Clock In Staff</h3>
           <form onSubmit={handleClockIn} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Select Event</label>
+              <label className="block text-sm font-medium mb-2">Event Name</label>
               <input
                 type="text"
                 value={eventName}
@@ -127,21 +182,53 @@ export default function TimesheetForm() {
                 placeholder="Enter event name (e.g., Wedding, Corporate Event)"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
                 required
+                list="previous-events"
               />
+              <datalist id="previous-events">
+                {previousEvents.map((name, idx) => (
+                  <option key={idx} value={name} />
+                ))}
+              </datalist>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Staff Name</label>
+            <div className="flex items-center gap-2 mb-4">
               <input
-                type="text"
-                value={staffName}
-                onChange={(e) => setStaffName(e.target.value)}
-                placeholder="Enter staff name"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
-                required
+                type="checkbox"
+                id="group-clock-in"
+                checked={isGroupClockIn}
+                onChange={(e) => setIsGroupClockIn(e.target.checked)}
+                className="w-4 h-4 text-[#a4c71d] rounded focus:ring-[#a4c71d]"
               />
+              <label htmlFor="group-clock-in" className="text-sm font-medium">
+                Group Clock-In (multiple staff)
+              </label>
             </div>
 
+            {isGroupClockIn ? (
+              <div>
+                <label className="block text-sm font-medium mb-2">Staff Names (comma-separated)</label>
+                <textarea
+                  value={groupStaffNames}
+                  onChange={(e) => setGroupStaffNames(e.target.value)}
+                  placeholder="Enter staff names separated by commas (e.g., John, Jane, Bob)"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
+                  rows={3}
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium mb-2">Staff Name</label>
+                <input
+                  type="text"
+                  value={staffName}
+                  onChange={(e) => setStaffName(e.target.value)}
+                  placeholder="Enter staff name"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
+                  required
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-2">Clock In Time</label>
               <input
