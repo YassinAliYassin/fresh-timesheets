@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import Database from 'better-sqlite3';
+import { Pool } from 'pg';
 import XLSX from 'xlsx';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -14,66 +15,166 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'fresh-timesheets-secret-2026';
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// Request logging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
 
-// Initialize SQLite database
-const db = new Database('timesheets.db');
+// Database setup
+let db;
+let isPostgres = false;
+let pgPool;
 
-// Auto-create default admin if no users exist
-const adminCheck = db.prepare('SELECT COUNT(*) as count FROM users');
-if (adminCheck.get().count === 0) {
-  const hashedPassword = bcrypt.hashSync('admin123', 10);
-  db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)')
-    .run('admin', hashedPassword, 'admin');
-  console.log('✅ Default admin created: admin/admin123');
+if (process.env.DATABASE_URL) {
+  // PostgreSQL (Render)
+  isPostgres = true;
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  db = pgPool;
+  console.log('✅ Using PostgreSQL database');
+} else {
+  // SQLite (local dev)
+  db = new Database('timesheets.db');
+  console.log('✅ Using SQLite database');
 }
 
-// Create tables with proper schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT DEFAULT 'staff',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+// Initialize database tables
+async function initDb() {
+  if (isPostgres) {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'staff',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        client_name TEXT NOT NULL,
+        venue TEXT NOT NULL,
+        address TEXT,
+        event_date DATE NOT NULL,
+        start_time TIME,
+        end_time TIME,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS timesheets (
+        id SERIAL PRIMARY KEY,
+        event_id INTEGER NOT NULL,
+        staff_name TEXT NOT NULL,
+        clock_in TIMESTAMP NOT NULL,
+        clock_out TIMESTAMP,
+        hourly_rate REAL DEFAULT 40.0,
+        total_hours REAL,
+        total_amount REAL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } else {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'staff',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_name TEXT NOT NULL,
+        venue TEXT NOT NULL,
+        address TEXT,
+        event_date DATE NOT NULL,
+        start_time TIME,
+        end_time TIME,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS timesheets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id INTEGER NOT NULL,
+        staff_name TEXT NOT NULL,
+        clock_in DATETIME NOT NULL,
+        clock_out DATETIME,
+        hourly_rate REAL DEFAULT 40.0,
+        total_hours REAL,
+        total_amount REAL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  }
 
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_name TEXT NOT NULL,
-    venue TEXT NOT NULL,
-    address TEXT,
-    event_date DATE NOT NULL,
-    start_time TIME,
-    end_time TIME,
-    created_by INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id)
-  );
+  // Auto-create default admin
+  try {
+    if (isPostgres) {
+      const result = await db.query('SELECT COUNT(*) as count FROM users');
+      if (parseInt(result.rows[0].count) === 0) {
+        const hashedPassword = bcrypt.hashSync('admin123', 10);
+        await db.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', ['admin', hashedPassword, 'admin']);
+        console.log('✅ Default admin created: admin/admin123');
+      }
+    } else {
+      const adminCheck = db.prepare('SELECT COUNT(*) as count FROM users');
+      if (adminCheck.get().count === 0) {
+        const hashedPassword = bcrypt.hashSync('admin123', 10);
+        db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)').run('admin', hashedPassword, 'admin');
+        console.log('✅ Default admin created: admin/admin123');
+      }
+    }
+  } catch (err) {
+    console.log('Admin check skipped:', err.message);
+  }
+}
 
-  CREATE TABLE IF NOT EXISTS timesheets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id INTEGER NOT NULL,
-    staff_name TEXT NOT NULL,
-    clock_in DATETIME NOT NULL,
-    clock_out DATETIME,
-    hourly_rate REAL DEFAULT 40.0,
-    total_hours REAL,
-    total_amount REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (event_id) REFERENCES events(id)
-  );
-`);
+initDb().then(() => console.log('✅ Database initialized'));
 
-console.log('✅ Database initialized');
+// DB query helpers
+async function dbQuery(sql, params = []) {
+  if (isPostgres) {
+    // Convert ? params to $1, $2, etc for PostgreSQL
+    let pgSql = sql;
+    let pgParams = params;
+    
+    if (sql.includes('?')) {
+      let idx = 0;
+      pgSql = sql.replace(/\?/g, () => `$${++idx}`);
+    }
+    
+    const result = await db.query(pgSql, pgParams);
+    return result.rows;
+  } else {
+    // SQLite
+    const stmt = db.prepare(sql);
+    const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
+    
+    if (isSelect) {
+      return stmt.all(...params);
+    } else if (sql.trim().toUpperCase().startsWith('INSERT')) {
+      const result = stmt.run(...params);
+      return [{ id: result.lastInsertRowid, changes: result.changes }];
+    } else if (sql.trim().toUpperCase().startsWith('UPDATE') || sql.trim().toUpperCase().startsWith('DELETE')) {
+      const result = stmt.run(...params);
+      return [{ changes: result.changes }];
+    }
+    return stmt.run(...params);
+  }
+}
+
+async function dbGet(sql, params = []) {
+  const rows = await dbQuery(sql, params);
+  return rows[0];
+}
 
 // Helper: Calculate pay period (26th to 25th)
 function getPayPeriod(date) {
@@ -81,7 +182,7 @@ function getPayPeriod(date) {
   const day = d.getDate();
   const year = d.getFullYear();
   const month = d.getMonth();
-
+  
   if (day >= 26) {
     return {
       start: new Date(year, month, 26),
@@ -95,36 +196,29 @@ function getPayPeriod(date) {
   }
 }
 
-// Helper: Validate input
-function validateInput(data, requiredFields) {
-  for (const field of requiredFields) {
-    if (!data[field]) {
-      return `Missing required field: ${field}`;
-    }
-  }
-  return null;
-}
-
 // Auth routes
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password, role = 'staff' } = req.body;
     
-    const error = validateInput({ username, password }, ['username', 'password']);
-    if (error) return res.status(400).json({ error });
-
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Missing required field: username or password' });
+    }
+    
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
-
+    
     const hashedPassword = await bcrypt.hash(password, 10);
     
     try {
-      const stmt = db.prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)');
-      const result = stmt.run(username, hashedPassword, role);
-      res.json({ id: result.lastInsertRowid, username, role });
+      const result = await dbQuery(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        [username, hashedPassword, role]
+      );
+      res.json({ id: result[0].id, username, role });
     } catch (err) {
-      if (err.message.includes('UNIQUE constraint')) {
+      if (err.message?.includes('UNIQUE') || err.code === '23505') {
         return res.status(400).json({ error: 'Username already exists' });
       }
       throw err;
@@ -139,25 +233,25 @@ app.post('/api/login', (req, res) => {
   try {
     const { username, password } = req.body;
     
-    const error = validateInput({ username, password }, ['username', 'password']);
-    if (error) return res.status(400).json({ error });
-
-    const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
-    const user = stmt.get(username);
-    
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Missing required field: username or password' });
     }
     
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    
-    res.json({
-      token,
-      user: { id: user.id, username: user.username, role: user.role }
+    dbGet('SELECT * FROM users WHERE username = ?', [username]).then(user => {
+      if (!user || !bcrypt.compareSync(password, user.password)) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      const token = jwt.sign(
+        { id: user.id, username: user.username, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      res.json({
+        token,
+        user: { id: user.id, username: user.username, role: user.role }
+      });
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -165,7 +259,6 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// Middleware to verify JWT
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader?.split(' ')[1];
@@ -181,27 +274,29 @@ function authMiddleware(req, res, next) {
 }
 
 // Event routes
-app.post('/api/events', authMiddleware, (req, res) => {
+app.post('/api/events', authMiddleware, async (req, res) => {
   try {
     const { client_name, venue, address, event_date, start_time, end_time } = req.body;
     
-    const error = validateInput({ client_name, venue, event_date }, ['client_name', 'venue', 'event_date']);
-    if (error) return res.status(400).json({ error });
-
-    const stmt = db.prepare('INSERT INTO events (client_name, venue, address, event_date, start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    const result = stmt.run(client_name, venue, address || null, event_date, start_time || null, end_time || null, req.user.id);
+    if (!client_name || !venue || !event_date) {
+      return res.status(400).json({ error: 'Missing required field: client_name, venue, or event_date' });
+    }
     
-    res.json({ id: result.lastInsertRowid, client_name, venue, address, event_date });
+    const result = await dbQuery(
+      'INSERT INTO events (client_name, venue, address, event_date, start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [client_name, venue, address || null, event_date, start_time || null, end_time || null, req.user.id]
+    );
+    
+    res.json({ id: result[0].id, client_name, venue, address, event_date });
   } catch (err) {
     console.error('Create event error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.get('/api/events', authMiddleware, (req, res) => {
+app.get('/api/events', authMiddleware, async (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM events ORDER BY event_date DESC');
-    const events = stmt.all();
+    const events = await dbQuery('SELECT * FROM events ORDER BY event_date DESC');
     res.json(events);
   } catch (err) {
     console.error('Get events error:', err);
@@ -209,18 +304,21 @@ app.get('/api/events', authMiddleware, (req, res) => {
   }
 });
 
-app.put('/api/events/:id', authMiddleware, (req, res) => {
+app.put('/api/events/:id', authMiddleware, async (req, res) => {
   try {
     const { client_name, venue, address, event_date, start_time, end_time } = req.body;
     const { id } = req.params;
     
-    const error = validateInput({ client_name, venue, event_date }, ['client_name', 'venue', 'event_date']);
-    if (error) return res.status(400).json({ error });
-
-    const stmt = db.prepare('UPDATE events SET client_name = ?, venue = ?, address = ?, event_date = ?, start_time = ?, end_time = ? WHERE id = ?');
-    const result = stmt.run(client_name, venue, address || null, event_date, start_time || null, end_time || null, id);
+    if (!client_name || !venue || !event_date) {
+      return res.status(400).json({ error: 'Missing required field: client_name, venue, or event_date' });
+    }
     
-    if (result.changes === 0) {
+    const result = await dbQuery(
+      'UPDATE events SET client_name = ?, venue = ?, address = ?, event_date = ?, start_time = ?, end_time = ? WHERE id = ?',
+      [client_name, venue, address || null, event_date, start_time || null, end_time || null, id]
+    );
+    
+    if (result[0].changes === 0) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
@@ -231,14 +329,12 @@ app.put('/api/events/:id', authMiddleware, (req, res) => {
   }
 });
 
-app.delete('/api/events/:id', authMiddleware, (req, res) => {
+app.delete('/api/events/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const result = await dbQuery('DELETE FROM events WHERE id = ?', [id]);
     
-    const stmt = db.prepare('DELETE FROM events WHERE id = ?');
-    const result = stmt.run(id);
-    
-    if (result.changes === 0) {
+    if (result[0].changes === 0) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
@@ -250,36 +346,37 @@ app.delete('/api/events/:id', authMiddleware, (req, res) => {
 });
 
 // Timesheet routes
-app.post('/api/timesheets/clock-in', authMiddleware, (req, res) => {
+app.post('/api/timesheets/clock-in', authMiddleware, async (req, res) => {
   try {
     const { event_id, staff_name, clock_in } = req.body;
     
-    const error = validateInput({ event_id, staff_name }, ['event_id', 'staff_name']);
-    if (error) return res.status(400).json({ error });
-
-    const stmt = db.prepare('INSERT INTO timesheets (event_id, staff_name, clock_in) VALUES (?, ?, ?)');
-    const result = stmt.run(event_id, staff_name, clock_in || new Date().toISOString());
+    if (!event_id || !staff_name) {
+      return res.status(400).json({ error: 'Missing required field: event_id or staff_name' });
+    }
     
-    res.json({ id: result.lastInsertRowid, message: 'Clocked in successfully' });
+    const result = await dbQuery(
+      'INSERT INTO timesheets (event_id, staff_name, clock_in) VALUES (?, ?, ?)',
+      [event_id, staff_name, clock_in || new Date().toISOString()]
+    );
+    
+    res.json({ id: result[0].id, message: 'Clocked in successfully' });
   } catch (err) {
     console.error('Clock in error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/timesheets/clock-out', authMiddleware, (req, res) => {
+app.post('/api/timesheets/clock-out', authMiddleware, async (req, res) => {
   try {
     const { timesheet_id, clock_out } = req.body;
     
     if (!timesheet_id) {
       return res.status(400).json({ error: 'Missing timesheet_id' });
     }
-
+    
     const clockOutTime = clock_out || new Date().toISOString();
     
-    // Get clock in time
-    const getStmt = db.prepare('SELECT clock_in, hourly_rate FROM timesheets WHERE id = ?');
-    const record = getStmt.get(timesheet_id);
+    const record = await dbGet('SELECT clock_in, hourly_rate FROM timesheets WHERE id = ?', [timesheet_id]);
     
     if (!record) return res.status(404).json({ error: 'Timesheet not found' });
     
@@ -288,8 +385,10 @@ app.post('/api/timesheets/clock-out', authMiddleware, (req, res) => {
     const totalHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
     const totalAmount = totalHours * (record.hourly_rate || 40);
     
-    const updateStmt = db.prepare('UPDATE timesheets SET clock_out = ?, total_hours = ?, total_amount = ? WHERE id = ?');
-    updateStmt.run(clockOutTime, totalHours, totalAmount, timesheet_id);
+    await dbQuery(
+      'UPDATE timesheets SET clock_out = ?, total_hours = ?, total_amount = ? WHERE id = ?',
+      [clockOutTime, totalHours, totalAmount, timesheet_id]
+    );
     
     res.json({ message: 'Clocked out successfully', total_hours: totalHours, total_amount: totalAmount });
   } catch (err) {
@@ -298,7 +397,7 @@ app.post('/api/timesheets/clock-out', authMiddleware, (req, res) => {
   }
 });
 
-app.get('/api/timesheets', authMiddleware, (req, res) => {
+app.get('/api/timesheets', authMiddleware, async (req, res) => {
   try {
     const { event_id, staff_name, month, year } = req.query;
     
@@ -321,15 +420,17 @@ app.get('/api/timesheets', authMiddleware, (req, res) => {
     }
     
     if (month && year) {
-      query += ' AND strftime("%m", t.clock_in) = ? AND strftime("%Y", t.clock_in) = ?';
+      if (isPostgres) {
+        query += ' AND EXTRACT(MONTH FROM t.clock_in) = ? AND EXTRACT(YEAR FROM t.clock_in) = ?';
+      } else {
+        query += ' AND strftime("%m", t.clock_in) = ? AND strftime("%Y", t.clock_in) = ?';
+      }
       params.push(month.padStart(2, '0'), year);
     }
     
     query += ' ORDER BY t.clock_in DESC';
     
-    const stmt = db.prepare(query);
-    const timesheets = stmt.all(...params);
-    
+    const timesheets = await dbQuery(query, params);
     res.json(timesheets);
   } catch (err) {
     console.error('Get timesheets error:', err);
@@ -338,7 +439,7 @@ app.get('/api/timesheets', authMiddleware, (req, res) => {
 });
 
 // Excel export for billing
-app.get('/api/export/billing', authMiddleware, (req, res) => {
+app.get('/api/export/billing', authMiddleware, async (req, res) => {
   try {
     const { month, year, staff_name } = req.query;
     
@@ -359,7 +460,11 @@ app.get('/api/export/billing', authMiddleware, (req, res) => {
     const params = [];
     
     if (month && year) {
-      query += ' AND strftime("%m", t.clock_in) = ? AND strftime("%Y", t.clock_in) = ?';
+      if (isPostgres) {
+        query += ' AND EXTRACT(MONTH FROM t.clock_in) = ? AND EXTRACT(YEAR FROM t.clock_in) = ?';
+      } else {
+        query += ' AND strftime("%m", t.clock_in) = ? AND strftime("%Y", t.clock_in) = ?';
+      }
       params.push(month.padStart(2, '0'), year);
     }
     
@@ -370,16 +475,13 @@ app.get('/api/export/billing', authMiddleware, (req, res) => {
     
     query += ' ORDER BY t.staff_name, t.clock_in';
     
-    const stmt = db.prepare(query);
-    const data = stmt.all(...params);
+    const data = await dbQuery(query, params);
     
-    // Create Excel workbook
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Timesheets');
     
-    // Add summary sheet
-    const summary = db.prepare(`
+    const summary = await dbQuery(`
       SELECT 
         staff_name,
         COUNT(*) as total_shifts,
@@ -389,7 +491,7 @@ app.get('/api/export/billing', authMiddleware, (req, res) => {
       WHERE clock_out IS NOT NULL
       GROUP BY staff_name
       ORDER BY total_amount DESC
-    `).all();
+    `);
     
     const ws2 = XLSX.utils.json_to_sheet(summary);
     XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
@@ -406,12 +508,12 @@ app.get('/api/export/billing', authMiddleware, (req, res) => {
 });
 
 // Get monthly summary for billing cycle (26th to 25th)
-app.get('/api/billing/cycle', authMiddleware, (req, res) => {
+app.get('/api/billing/cycle', authMiddleware, async (req, res) => {
   try {
     const { date } = req.query;
     const period = getPayPeriod(date || new Date());
     
-    const stmt = db.prepare(`
+    const summary = await dbQuery(`
       SELECT 
         staff_name,
         COUNT(*) as shifts,
@@ -423,9 +525,7 @@ app.get('/api/billing/cycle', authMiddleware, (req, res) => {
         AND clock_in <= ?
       GROUP BY staff_name
       ORDER BY total_amount DESC
-    `);
-    
-    const summary = stmt.all(period.start.toISOString(), period.end.toISOString());
+    `, [period.start.toISOString(), period.end.toISOString()]);
     
     res.json({
       period_start: period.start,
@@ -440,14 +540,14 @@ app.get('/api/billing/cycle', authMiddleware, (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', database: isPostgres ? 'postgres' : 'sqlite', timestamp: new Date().toISOString() });
 });
 
-// SPA catch-all for React Router
+// SPA catch-all
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Fresh Timesheets API running on http://localhost:${PORT}`);
+  console.log(`🚀 Fresh Timesheets API running on port ${PORT}`);
 });
