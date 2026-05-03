@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import API_URL from './api';
 
 export default function TimesheetForm() {
-  const [events, setEvents] = useState<any[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState('');
+  const [eventName, setEventName] = useState('');
   const [staffName, setStaffName] = useState('');
   const [clockIn, setClockIn] = useState('');
   const [activeTimesheets, setActiveTimesheets] = useState<any[]>([]);
@@ -12,23 +11,8 @@ export default function TimesheetForm() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchEvents();
     fetchActiveTimesheets();
   }, []);
-
-  const fetchEvents = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/api/events`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch events');
-      const data = await res.json();
-      setEvents(data);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
 
   const fetchActiveTimesheets = async () => {
     try {
@@ -46,8 +30,8 @@ export default function TimesheetForm() {
 
   const handleClockIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEvent || !staffName) {
-      setError('Please select an event and enter staff name');
+    if (!eventName || !staffName) {
+      setError('Please enter an event name and staff name');
       return;
     }
 
@@ -63,7 +47,7 @@ export default function TimesheetForm() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          event_id: selectedEvent,
+          event_name: eventName,
           staff_name: staffName,
           clock_in: clockIn || new Date().toISOString()
         })
@@ -73,7 +57,7 @@ export default function TimesheetForm() {
 
       setMessage(`✅ ${staffName} clocked in successfully!`);
       setStaffName('');
-      setSelectedEvent('');
+      setEventName('');
       setClockIn('');
       fetchActiveTimesheets();
     } catch (err: any) {
@@ -136,19 +120,14 @@ export default function TimesheetForm() {
           <form onSubmit={handleClockIn} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Select Event</label>
-              <select
-                value={selectedEvent}
-                onChange={(e) => setSelectedEvent(e.target.value)}
+              <input
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="Enter event name (e.g., Wedding, Corporate Event)"
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#a4c71d] focus:border-transparent"
                 required
-              >
-                <option value="">Choose an event...</option>
-                {events.map((event: any) => (
-                  <option key={event.id} value={event.id}>
-                    {event.client_name} - {event.venue}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
@@ -195,7 +174,7 @@ export default function TimesheetForm() {
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-bold">{ts.staff_name}</p>
-                      <p className="text-sm text-gray-600">Event: {ts.event_id}</p>
+                      <p className="text-sm text-gray-600">Event: {ts.event_name}</p>
                       <p className="text-sm text-gray-600">
                         Clock In: {new Date(ts.clock_in).toLocaleString()}
                       </p>
