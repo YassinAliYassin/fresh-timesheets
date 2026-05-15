@@ -2,13 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import TimesheetForm from './components/TimesheetForm';
 import EventManager from './components/EventManager';
 import BillingExport from './components/BillingExport';
 import Reports from './components/Reports';
 import EmailNotifications from './components/EmailNotifications';
 import CalendarView from './components/CalendarView';
-import TimesheetList from './components/TimesheetList';
 import QuotationForm from './components/QuotationForm';
 import useDarkMode from './hooks/useDarkMode';
 
@@ -55,13 +53,11 @@ function App() {
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/" /> : <Login setUser={setUser} />} />
             <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/timesheet" element={user ? <TimesheetForm /> : <Navigate to="/login" />} />
             <Route path="/events" element={user ? <EventManager /> : <Navigate to="/login" />} />
             <Route path="/billing" element={user ? <BillingExport /> : <Navigate to="/login" />} />
             <Route path="/reports" element={user ? <Reports /> : <Navigate to="/login" />} />
             <Route path="/notifications" element={user ? <EmailNotifications /> : <Navigate to="/login" />} />
             <Route path="/calendar" element={user ? <CalendarView /> : <Navigate to="/login" />} />
-            <Route path="/list" element={user ? <TimesheetList /> : <Navigate to="/login" />} />
             <Route path="/quotation" element={user ? <QuotationForm /> : <Navigate to="/login" />} />
           </Routes>
         </div>

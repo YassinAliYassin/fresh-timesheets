@@ -2,16 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 interface DashboardStats {
-  totalHours: number;
-  pendingTimesheets: number;
+  totalProjects: number;
   activeProjects: number;
   teamMembers: number;
 }
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalHours: 0,
-    pendingTimesheets: 0,
+    totalProjects: 0,
     activeProjects: 0,
     teamMembers: 0
   });
@@ -36,7 +34,6 @@ export default function Dashboard() {
   };
 
   const quickActions = [
-    { icon: 'fa-clock', title: 'Log Time', desc: 'Submit your timesheet', link: '/timesheet', color: 'bg-blue-500' },
     { icon: 'fa-calendar', title: 'Events', desc: 'Manage schedules', link: '/events', color: 'bg-green-500' },
     { icon: 'fa-file-invoice-dollar', title: 'Billing', desc: 'Export invoices', link: '/billing', color: 'bg-purple-500' },
     { icon: 'fa-file-alt', title: 'Reports', desc: 'View analytics', link: '/reports', color: 'bg-orange-500' },
@@ -55,20 +52,20 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <i className="fas fa-hourglass-half text-3xl text-blue-500"></i>
-            <span className="text-3xl font-bold text-gray-800">{stats.totalHours}</span>
+            <i className="fas fa-folder-open text-3xl text-blue-500"></i>
+            <span className="text-3xl font-bold text-gray-800">{stats.totalProjects}</span>
           </div>
-          <h3 className="font-semibold text-gray-700">Total Hours</h3>
-          <p className="text-sm text-gray-500 mt-1">This month</p>
+          <h3 className="font-semibold text-gray-700">Total Projects</h3>
+          <p className="text-sm text-gray-500 mt-1">All time</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <i className="fas fa-clock text-3xl text-yellow-500"></i>
-            <span className="text-3xl font-bold text-gray-800">{stats.pendingTimesheets}</span>
+            <i className="fas fa-play-circle text-3xl text-green-500"></i>
+            <span className="text-3xl font-bold text-gray-800">{stats.activeProjects}</span>
           </div>
-          <h3 className="font-semibold text-gray-700">Pending</h3>
-          <p className="text-sm text-gray-500 mt-1">Timesheets to review</p>
+          <h3 className="font-semibold text-gray-700">Active Projects</h3>
+          <p className="text-sm text-gray-500 mt-1">In progress</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
