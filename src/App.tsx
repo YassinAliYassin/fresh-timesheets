@@ -26,32 +26,28 @@ function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-[#1a1a1a] text-white p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">
-            <span className="text-gray-400">Fresh</span>
-            <span className="text-[#a4c71d]">Timesheets</span>
-          </h1>
-          {user && (
-            <div className="flex gap-4 items-center">
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white transition-colors"
-                title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {isDark ? '☀️' : '🌙'}
-              </button>
-              <span className="text-sm">{user.username} ({user.role})</span>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  setUser(null);
-                }}
-                className="bg-red-500 px-4 py-2 rounded hover:bg-red-600"
-              >
-                Logout
-              </button>
+        <nav className="bg-white shadow-sm border-b border-gray-200">
+          <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <i className="fas fa-clock text-[#a4c71d] text-2xl"></i>
+              <h1 className="text-xl font-bold">
+                <span className="text-gray-700">Fresh</span>
+                <span className="text-[#a4c71d]">People</span>
+              </h1>
             </div>
-          )}
+            {user && (
+              <div className="flex gap-3 items-center">
+                <button onClick={toggleDarkMode} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={isDark ? 'Light Mode' : 'Dark Mode'}>
+                  {isDark ? <i className="fas fa-sun text-yellow-500"></i> : <i className="fas fa-moon text-gray-600"></i>}
+                </button>
+                <span className="text-sm text-gray-600">{user.username}</span>
+                <span className="px-2 py-1 bg-[#a4c71d] text-white text-xs rounded-full">{user.role}</span>
+                <button onClick={() => { localStorage.removeItem('token'); setUser(null); }} className="btn-secondary text-sm">
+                  <i className="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
 
         <div className="container mx-auto p-6">
