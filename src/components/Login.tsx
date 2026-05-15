@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import API_URL from './api';
 
 export default function Login({ setUser }: { setUser: (user: any) => void }) {
@@ -115,6 +115,15 @@ export default function Login({ setUser }: { setUser: (user: any) => void }) {
             Default admin: admin / admin123
           </p>
         )}
+
+        <div className="mt-8 bg-gradient-to-r from-[#a4c71d] to-green-600 rounded-2xl p-8 text-white text-center">
+          <i className="fas fa-quote-left text-4xl mb-4 opacity-80"></i>
+          <h3 className="text-2xl font-bold mb-2">Need a Custom Quote?</h3>
+          <p className="mb-6 opacity-90">Get a personalized quotation for your project in less than 24 hours.</p>
+          <Link to="/quotation" className="bg-white text-[#a4c71d] px-8 py-3 rounded-lg font-semibold inline-flex items-center gap-2 hover:bg-gray-100 transition-colors">
+            <i className="fas fa-paper-plane"></i> Request Quote Now
+          </Link>
+        </div>
       </div>
     </div>
   );
