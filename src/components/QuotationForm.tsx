@@ -31,6 +31,7 @@ export default function QuotationForm() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -55,8 +56,8 @@ export default function QuotationForm() {
 
       if (!response.ok) throw new Error('Failed to submit quotation');
 
-      alert('Quotation submitted successfully!');
-      navigate('/');
+      setSuccess(true);
+      setTimeout(() => navigate('/'), 2000);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -72,6 +73,7 @@ export default function QuotationForm() {
       </div>
 
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">{error}</div>}
+      {success && <div className="bg-green-50 text-green-600 p-4 rounded-lg mb-6 flex items-center gap-2"><i className="fas fa-check-circle"></i> Quotation submitted successfully! Redirecting...</div>}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
