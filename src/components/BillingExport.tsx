@@ -11,7 +11,7 @@ export default function BillingExport({ token }: BillingExportProps) {
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const API = 'http://localhost:3000/api';
+  const API = '/api';
 
   const fetchTimesheets = async () => {
     if (!startDate || !endDate) return alert('Select date range');

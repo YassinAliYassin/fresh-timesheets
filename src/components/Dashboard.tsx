@@ -10,12 +10,12 @@ export default function Dashboard({ token }) {
   }, []);
 
   const fetchStats = async () => {
-    const res = await fetch('http://localhost:3000/api/events', {
+    const res = await fetch('/api/events', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const events = await res.json();
     
-    const res2 = await fetch('http://localhost:3000/api/timesheets', {
+    const res2 = await fetch('/api/timesheets', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const sheets = await res2.json();

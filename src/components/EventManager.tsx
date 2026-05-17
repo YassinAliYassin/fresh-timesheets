@@ -17,7 +17,7 @@ export default function EventManager({ token }: EventManagerProps) {
   const [form, setForm] = useState({ client_name: '', venue: '', address: '', event_date: '' });
   const [loading, setLoading] = useState(false);
 
-  const API = 'http://localhost:3000/api';
+  const API = '/api';
 
   useEffect(() => { fetchEvents(); }, []);
 
