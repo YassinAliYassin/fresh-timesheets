@@ -8,6 +8,7 @@ import Reports from './components/Reports';
 import EmailNotifications from './components/EmailNotifications';
 import CalendarView from './components/CalendarView';
 import QuotationForm from './components/QuotationForm';
+import TimesheetEntry from './components/TimesheetEntry';
 import useDarkMode from './hooks/useDarkMode';
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
             <Route path="/notifications" element={user ? <EmailNotifications /> : <Navigate to="/login" />} />
             <Route path="/calendar" element={user ? <CalendarView /> : <Navigate to="/login" />} />
             <Route path="/quotation" element={user ? <QuotationForm /> : <Navigate to="/login" />} />
+            <Route path="/timesheets" element={user ? <TimesheetEntry /> : <Navigate to="/login" />} />
           </Routes>
         </div>
       </div>

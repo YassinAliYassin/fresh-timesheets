@@ -37,6 +37,7 @@ export default function Dashboard() {
     { icon: 'fa-file-invoice-dollar', title: 'Billing', desc: 'Export invoices', link: '/billing', color: 'bg-purple-500' },
     { icon: 'fa-file-alt', title: 'Reports', desc: 'View analytics', link: '/reports', color: 'bg-orange-500' },
     { icon: 'fa-envelope', title: 'Notifications', desc: 'Email alerts', link: '/notifications', color: 'bg-red-500' },
+    { icon: 'fa-clock', title: 'Timesheets', desc: 'Clock in/out', link: '/timesheets', color: 'bg-blue-500' },
     { icon: 'fa-file-signature', title: 'Quotation', desc: 'Request a quote', link: '/quotation', color: 'bg-[#a4c71d]' }
   ];
 
