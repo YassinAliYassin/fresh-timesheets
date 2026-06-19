@@ -506,12 +506,13 @@ app.get('/api/export/billing', authMiddleware, async (req, res) => {
     XLSX.utils.book_append_sheet(wb, ws, 'Timesheets');
     
     const summary = await dbQuery(`
-      SELECT 
+      SELECT
         staff_name,
         COUNT(*) as total_shifts,
         ROUND(SUM(total_hours), 2) as total_hours,
+        ROUND(AVG(hourly_rate), 2) as rate,
         ROUND(SUM(total_amount), 2) as total_amount
-      FROM timesheets 
+      FROM timesheets
       WHERE clock_out IS NOT NULL
       GROUP BY staff_name
       ORDER BY total_amount DESC
@@ -538,12 +539,13 @@ app.get('/api/billing/cycle', authMiddleware, async (req, res) => {
     const period = getPayPeriod(date || new Date());
     
     const summary = await dbQuery(`
-      SELECT 
+      SELECT
         staff_name,
         COUNT(*) as shifts,
         ROUND(SUM(total_hours), 2) as total_hours,
+        ROUND(AVG(hourly_rate), 2) as rate,
         ROUND(SUM(total_amount), 2) as total_amount
-      FROM timesheets 
+      FROM timesheets
       WHERE clock_out IS NOT NULL
         AND clock_in >= ?
         AND clock_in <= ?
@@ -562,15 +564,50 @@ app.get('/api/billing/cycle', authMiddleware, async (req, res) => {
   }
 });
 
+// Dashboard stats
+app.get('/api/stats', authMiddleware, async (req, res) => {
+  try {
+    const eventCount = await dbGet('SELECT COUNT(*) as count FROM events');
+    const userCount = await dbGet('SELECT COUNT(*) as count FROM users');
+    const hoursResult = await dbGet('SELECT COALESCE(SUM(total_hours), 0) as total FROM timesheets WHERE clock_out IS NOT NULL');
+    const billingResult = await dbGet('SELECT COALESCE(SUM(total_amount), 0) as total FROM timesheets WHERE clock_out IS NOT NULL');
+
+    const now = new Date().toISOString().split('T')[0];
+    const activeEvents = await dbGet('SELECT COUNT(*) as count FROM events WHERE event_date >= ?', [now]);
+
+    res.json({
+      totalEvents: eventCount?.count || 0,
+      teamMembers: userCount?.count || 0,
+      totalHours: parseFloat(hoursResult?.total) || 0,
+      totalBilling: parseFloat(billingResult?.total) || 0,
+      activeEvents: activeEvents?.count || 0,
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', database: isPostgres ? 'postgres' : 'sqlite', timestamp: new Date().toISOString() });
 });
 
-// SPA catch-all - DISABLED FOR DEBUGGING
-// app.get('/*', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-// });
+// Notification placeholder routes (to be implemented with email service)
+app.post('/api/notifications/settings', authMiddleware, async (req, res) => {
+  // TODO: Save notification settings to database
+  res.json({ message: 'Settings saved (placeholder)' });
+});
+
+app.post('/api/notifications/test', authMiddleware, async (req, res) => {
+  // TODO: Send actual test email
+  res.json({ message: 'Test email sent (placeholder)' });
+});
+
+// SPA catch-all
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Fresh Timesheets API running on port ${PORT}`);

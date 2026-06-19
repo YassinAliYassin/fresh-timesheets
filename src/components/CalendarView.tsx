@@ -6,7 +6,7 @@ export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [dayEntries, setDayEntries] = useState<any[]>([]);
 
   useEffect(() => {
@@ -18,8 +18,8 @@ export default function CalendarView() {
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-      const res = await api.get(`/api/timesheets?month=${year}-${month.toString().padStart(2, '0')}`);
-      setTimesheets(res.data || []);
+      const data = await api.get(`/api/timesheets?month=${month}&year=${year}`);
+      setTimesheets(data || []);
     } catch (error) {
       console.error('Failed to fetch timesheets:', error);
     } finally {
@@ -39,17 +39,24 @@ export default function CalendarView() {
     return new Date(year, month, 1).getDay();
   };
 
-  const hasEntry = (day: any) => {
-    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    return timesheets.some(t => t.date === dateStr);
+  const formatDateStr = (day: number) => {
+    const year = currentDate.getFullYear();
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const dayStr = day.toString().padStart(2, '0');
+    return `${year}-${month}-${dayStr}`;
   };
 
-  const getDayEntries = (day: any) => {
-    const dateStr = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    return timesheets.filter(t => t.date === dateStr);
+  const hasEntry = (day: number) => {
+    const dateStr = formatDateStr(day);
+    return timesheets.some(t => t.clock_in && t.clock_in.startsWith(dateStr));
   };
 
-  const handleDayClick = (day: any) => {
+  const getDayEntries = (day: number) => {
+    const dateStr = formatDateStr(day);
+    return timesheets.filter(t => t.clock_in && t.clock_in.startsWith(dateStr));
+  };
+
+  const handleDayClick = (day: number) => {
     const entries = getDayEntries(day);
     setSelectedDate(day);
     setDayEntries(entries);
@@ -112,17 +119,15 @@ export default function CalendarView() {
 
           {/* Calendar Grid */}
           <div className="grid grid-cols-7 gap-2">
-            {/* Empty cells for days before month starts */}
             {[...Array(firstDay)].map((_, i) => (
               <div key={`empty-${i}`} className="h-20 rounded-lg" />
             ))}
 
-            {/* Days of the month */}
             {[...Array(daysInMonth)].map((_, i) => {
               const day = i + 1;
               const hasEntries = hasEntry(day);
               const isSelected = selectedDate === day;
-              const isToday = new Date().getDate() === day && 
+              const isToday = new Date().getDate() === day &&
                             new Date().getMonth() === currentDate.getMonth() &&
                             new Date().getFullYear() === currentDate.getFullYear();
 
@@ -160,7 +165,7 @@ export default function CalendarView() {
         {/* Day Details Sidebar */}
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {selectedDate 
+            {selectedDate
               ? `${selectedDate} ${monthNames[currentDate.getMonth()]} Details`
               : 'Select a Date'
             }
@@ -168,24 +173,24 @@ export default function CalendarView() {
 
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#a4c71d]"></div>
             </div>
           ) : selectedDate ? (
             dayEntries.length > 0 ? (
               <div className="space-y-3">
                 {dayEntries.map((entry, i) => (
                   <div key={i} className="p-3 bg-gray-50 rounded-lg">
-                    <p className="font-medium text-gray-900">{entry.staffName}</p>
-                    <p className="text-sm text-gray-600">{entry.eventName}</p>
+                    <p className="font-medium text-gray-900">{entry.staff_name}</p>
+                    <p className="text-sm text-gray-600">{entry.event_name}</p>
                     <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
                       <Clock size={12} />
-                      {entry.hours} hours
+                      {entry.total_hours ? `${entry.total_hours.toFixed(1)} hours` : 'In progress'}
                     </div>
                   </div>
                 ))}
                 <div className="pt-3 border-t">
                   <p className="text-sm font-medium text-gray-900">
-                    Total: {dayEntries.reduce((sum, e) => sum + e.hours, 0)} hours
+                    Total: {dayEntries.reduce((sum, e) => sum + (e.total_hours || 0), 0).toFixed(1)} hours
                   </p>
                 </div>
               </div>

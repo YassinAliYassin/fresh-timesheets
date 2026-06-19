@@ -29,19 +29,32 @@ export default function EmailNotifications() {
       setMessage({ type: 'success', text: 'Notification settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save settings' });
+      // If endpoint doesn't exist yet, show a graceful message
+      if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+        setMessage({ type: 'error', text: 'Notification service is not yet configured on the server.' });
+      } else {
+        setMessage({ type: 'error', text: error.message || 'Failed to save settings' });
+      }
     } finally {
       setSaving(false);
     }
   };
 
   const sendTestEmail = async () => {
+    if (!settings.email) {
+      setMessage({ type: 'error', text: 'Please enter an email address first.' });
+      return;
+    }
     try {
       await api.post('/api/notifications/test', { email: settings.email });
       setMessage({ type: 'success', text: 'Test email sent successfully!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error: any) {
-      setMessage({ type: 'error', text: 'Failed to send test email' });
+      if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+        setMessage({ type: 'error', text: 'Email service is not yet configured on the server.' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to send test email' });
+      }
     }
   };
 
@@ -74,7 +87,7 @@ export default function EmailNotifications() {
               value={settings.email}
               onChange={(e) => setSettings({ ...settings, email: e.target.value })}
               placeholder="you@company.com"
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#a4c71d]"
             />
           </div>
         </div>
@@ -82,7 +95,7 @@ export default function EmailNotifications() {
         {/* Notification Toggles */}
         <div className="space-y-4">
           <h3 className="font-semibold text-gray-900">Notify me when:</h3>
-          
+
           {[
             { key: 'notifyOnSubmit', label: 'Timesheet submitted', desc: 'When staff submit new timesheets' },
             { key: 'notifyOnApprove', label: 'Timesheet approved', desc: 'When a timesheet is approved' },
@@ -113,7 +126,7 @@ export default function EmailNotifications() {
           <button
             onClick={saveSettings}
             disabled={saving}
-            className="flex-1 bg-[#a4c71d] text-white py-2.5 rounded-lg hover:bg-[#8fb018] transition-colors disabled:opacity-50"
+            className="flex-1 bg-[#a4c71d] text-white py-2.5 rounded-lg hover:bg-[#8fb018] transition-colors disabled:opacity-50 font-semibold"
           >
             {saving ? 'Saving...' : 'Save Settings'}
           </button>

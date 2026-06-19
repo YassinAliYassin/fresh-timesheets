@@ -3,42 +3,64 @@ import 'jspdf-autotable';
 import api from './api';
 
 export default function PDFExport() {
-  const handleExport = async (type = 'timesheets') => {
+  const handleExport = async (type: 'timesheets' | 'billing' = 'timesheets') => {
     try {
-      const endpoint = type === 'timesheets' ? '/api/timesheets' : '/api/billing';
-      const res = await fetch(`${api.defaults.baseURL}${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      const items = data.data || data;
+      const data = await api.get('/api/timesheets');
+      const items = data || [];
 
       const doc = new jsPDF();
-      
+
       // Add header
       doc.setFontSize(20);
       doc.text('Fresh Timesheets', 14, 22);
       doc.setFontSize(10);
       doc.text(`Exported: ${new Date().toLocaleDateString()}`, 14, 30);
-      
-      // Add table
-      const headers = type === 'timesheets' 
-        ? ['Date', 'Staff', 'Event', 'Hours', 'Rate', 'Total']
-        : ['Invoice #', 'Client', 'Date', 'Amount', 'Status'];
-      
-      const rows = items.map((item: any) => 
-        type === 'timesheets'
-          ? [item.date, item.staffName, item.eventName, item.hours, `R${item.rate}`, `R${(item.hours * item.rate).toFixed(2)}`]
-          : [item.invoiceNumber, item.clientName, item.date, `R${item.amount}`, item.status]
-      );
 
-      (doc as any).autoTable({
-        head: [headers],
-        body: rows,
-        startY: 40,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [164, 199, 29] } // Fresh People green
-      });
+      if (type === 'timesheets') {
+        const completedItems = items.filter((item: any) => item.clock_out);
+        const rows = completedItems.map((item: any) => [
+          item.clock_in ? new Date(item.clock_in).toLocaleDateString() : '',
+          item.staff_name || '',
+          item.event_name || '',
+          item.total_hours ? item.total_hours.toFixed(1) : 'In progress',
+          `R${(item.hourly_rate || 40).toFixed(2)}`,
+          item.total_amount ? `R${item.total_amount.toFixed(2)}` : '-'
+        ]);
+
+        (doc as any).autoTable({
+          head: [['Date', 'Staff', 'Event', 'Hours', 'Rate', 'Total']],
+          body: rows,
+          startY: 40,
+          theme: 'grid',
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [164, 199, 29] }
+        });
+      } else {
+        // Billing summary by staff
+        const staffSummary: { [key: string]: { hours: number; amount: number; rate: number } } = {};
+        items.filter((i: any) => i.clock_out).forEach((item: any) => {
+          const name = item.staff_name || 'Unknown';
+          if (!staffSummary[name]) staffSummary[name] = { hours: 0, amount: 0, rate: item.hourly_rate || 40 };
+          staffSummary[name].hours += item.total_hours || 0;
+          staffSummary[name].amount += item.total_amount || 0;
+        });
+
+        const rows = Object.entries(staffSummary).map(([name, s]) => [
+          name,
+          s.hours.toFixed(1),
+          `R${s.rate.toFixed(2)}`,
+          `R${s.amount.toFixed(2)}`
+        ]);
+
+        (doc as any).autoTable({
+          head: [['Staff', 'Total Hours', 'Rate', 'Total Amount']],
+          body: rows,
+          startY: 40,
+          theme: 'grid',
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [164, 199, 29] }
+        });
+      }
 
       doc.save(`${type}_export_${Date.now()}.pdf`);
     } catch (error) {
