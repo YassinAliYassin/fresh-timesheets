@@ -24,15 +24,9 @@ export default function TimesheetEntry() {
   const [showRecent, setShowRecent] = useState(false);
   const [eventSuggestions, setEventSuggestions] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchActiveRecords();
-    fetchRecentRecords();
-    fetchEventNames();
-  }, []);
-
   const fetchActiveRecords = async () => {
     try {
-      const data = await api.get('/api/timesheets');
+      const data = await api.get<TimesheetRecord[]>('/api/timesheets');
       const active = (data || []).filter((t: TimesheetRecord) => !t.clock_out);
       setActiveRecords(active);
     } catch (err) {
@@ -42,7 +36,7 @@ export default function TimesheetEntry() {
 
   const fetchRecentRecords = async () => {
     try {
-      const data = await api.get('/api/timesheets');
+      const data = await api.get<TimesheetRecord[]>('/api/timesheets');
       const completed = (data || [])
         .filter((t: TimesheetRecord) => t.clock_out)
         .slice(0, 10);
@@ -54,12 +48,18 @@ export default function TimesheetEntry() {
 
   const fetchEventNames = async () => {
     try {
-      const names = await api.get('/api/events/names');
+      const names = await api.get<string[]>('/api/events/names');
       setEventSuggestions(names || []);
     } catch (err) {
       console.error('Failed to fetch event names:', err);
     }
   };
+
+  useEffect(() => {
+    fetchActiveRecords();
+    fetchRecentRecords();
+    fetchEventNames();
+  }, []);
 
   const handleClockIn = async () => {
     if (!eventName || (!staffName && !groupNames.some(n => n.trim()))) {
@@ -92,8 +92,8 @@ export default function TimesheetEntry() {
       fetchActiveRecords();
       fetchRecentRecords();
       fetchEventNames();
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to clock in' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to clock in' });
     } finally {
       setLoading(false);
     }
@@ -108,8 +108,8 @@ export default function TimesheetEntry() {
       setMessage({ type: 'success', text: '✅ Clocked out successfully!' });
       fetchActiveRecords();
       fetchRecentRecords();
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to clock out' });
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to clock out' });
     } finally {
       setLoading(false);
     }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import API_URL from './api';
+import type { AuthUser } from '../types';
 
-export default function Login({ setUser }: { setUser: (user: any) => void }) {
+export default function Login({ setUser }: { setUser: (user: AuthUser) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
@@ -36,8 +37,8 @@ export default function Login({ setUser }: { setUser: (user: any) => void }) {
       localStorage.setItem('token', data.token);
       setUser(data.user);
       navigate('/');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setLoading(false);
     }

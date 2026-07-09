@@ -28,12 +28,13 @@ export default function EmailNotifications() {
       await api.post('/api/notifications/settings', settings);
       setMessage({ type: 'success', text: 'Notification settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If endpoint doesn't exist yet, show a graceful message
-      if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('404') || message.includes('Not Found')) {
         setMessage({ type: 'error', text: 'Notification service is not yet configured on the server.' });
       } else {
-        setMessage({ type: 'error', text: error.message || 'Failed to save settings' });
+        setMessage({ type: 'error', text: message || 'Failed to save settings' });
       }
     } finally {
       setSaving(false);
@@ -49,8 +50,9 @@ export default function EmailNotifications() {
       await api.post('/api/notifications/test', { email: settings.email });
       setMessage({ type: 'success', text: 'Test email sent successfully!' });
       setTimeout(() => setMessage(null), 3000);
-    } catch (error: any) {
-      if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('404') || message.includes('Not Found')) {
         setMessage({ type: 'error', text: 'Email service is not yet configured on the server.' });
       } else {
         setMessage({ type: 'error', text: 'Failed to send test email' });

@@ -58,8 +58,8 @@ export default function QuotationForm() {
 
       setSuccess(true);
       setTimeout(() => navigate('/'), 2000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to submit quotation');
     } finally {
       setLoading(false);
     }

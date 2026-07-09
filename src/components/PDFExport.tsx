@@ -1,11 +1,12 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import api from './api';
+import type { TimesheetRecord } from '../types';
 
 export default function PDFExport() {
   const handleExport = async (type: 'timesheets' | 'billing' = 'timesheets') => {
     try {
-      const data = await api.get('/api/timesheets');
+      const data = await api.get<TimesheetRecord[]>('/api/timesheets');
       const items = data || [];
 
       const doc = new jsPDF();
@@ -17,8 +18,8 @@ export default function PDFExport() {
       doc.text(`Exported: ${new Date().toLocaleDateString()}`, 14, 30);
 
       if (type === 'timesheets') {
-        const completedItems = items.filter((item: any) => item.clock_out);
-        const rows = completedItems.map((item: any) => [
+        const completedItems = items.filter((item) => item.clock_out);
+        const rows = completedItems.map((item) => [
           item.clock_in ? new Date(item.clock_in).toLocaleDateString() : '',
           item.staff_name || '',
           item.event_name || '',
@@ -27,7 +28,7 @@ export default function PDFExport() {
           item.total_amount ? `R${item.total_amount.toFixed(2)}` : '-'
         ]);
 
-        (doc as any).autoTable({
+        autoTable(doc, {
           head: [['Date', 'Staff', 'Event', 'Hours', 'Rate', 'Total']],
           body: rows,
           startY: 40,
@@ -38,7 +39,7 @@ export default function PDFExport() {
       } else {
         // Billing summary by staff
         const staffSummary: { [key: string]: { hours: number; amount: number; rate: number } } = {};
-        items.filter((i: any) => i.clock_out).forEach((item: any) => {
+        items.filter((i) => i.clock_out).forEach((item) => {
           const name = item.staff_name || 'Unknown';
           if (!staffSummary[name]) staffSummary[name] = { hours: 0, amount: 0, rate: item.hourly_rate || 40 };
           staffSummary[name].hours += item.total_hours || 0;
@@ -52,7 +53,7 @@ export default function PDFExport() {
           `R${s.amount.toFixed(2)}`
         ]);
 
-        (doc as any).autoTable({
+        autoTable(doc, {
           head: [['Staff', 'Total Hours', 'Rate', 'Total Amount']],
           body: rows,
           startY: 40,

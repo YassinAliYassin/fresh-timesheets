@@ -1,61 +1,65 @@
 import { useState, useEffect } from 'react';
 import api from './api';
+import type { TimesheetRecord, EventItem, ReportComputedData } from '../types';
+
+function getDefaultDateRange(): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0]
+  };
+}
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  });
-
-  useEffect(() => {
-    fetchReportData();
-  }, [dateRange]);
+  const [dateRange, setDateRange] = useState(getDefaultDateRange);
+  const [computedData, setComputedData] = useState<ReportComputedData | null>(null);
 
   const fetchReportData = async () => {
     setLoading(true);
     setError('');
     try {
       const [timesheetsData, eventsData] = await Promise.all([
-        api.get('/api/timesheets'),
-        api.get('/api/events'),
+        api.get<TimesheetRecord[]>('/api/timesheets'),
+        api.get<EventItem[]>('/api/events'),
       ]);
 
       const allTimesheets = timesheetsData || [];
       const allEvents = eventsData || [];
 
       // Filter by date range
-      const filteredTimesheets = allTimesheets.filter((t: any) => {
+      const filteredTimesheets = allTimesheets.filter((t) => {
         const date = new Date(t.clock_in);
         return date >= new Date(dateRange.start) && date <= new Date(dateRange.end + 'T23:59:59');
       });
 
-      const totalHours = filteredTimesheets.reduce((sum: number, t: any) => sum + (t.total_hours || 0), 0);
+      const totalHours = filteredTimesheets.reduce((sum, t) => sum + (t.total_hours || 0), 0);
       const totalEvents = allEvents.length;
-      const totalBilling = filteredTimesheets.reduce((sum: number, t: any) => sum + (t.total_amount || 0), 0);
-      const uniqueDays = new Set(filteredTimesheets.map((t: any) => t.clock_in?.substring(0, 10))).size;
+      const totalBilling = filteredTimesheets.reduce((sum, t) => sum + ((t.total_amount || 0)), 0);
+      const uniqueDays = new Set(filteredTimesheets.map((t) => t.clock_in?.substring(0, 10))).size;
       const averageHoursPerDay = uniqueDays > 0 ? totalHours / uniqueDays : 0;
 
       // Top events by hours
       const eventHours: { [key: string]: number } = {};
-      filteredTimesheets.forEach((t: any) => {
+      filteredTimesheets.forEach((t) => {
         const name = t.event_name || 'Unknown';
         eventHours[name] = (eventHours[name] || 0) + (t.total_hours || 0);
       });
       const topEvents = Object.entries(eventHours)
-        .map(([name, hours]) => ({ name, hours: hours as number }))
+        .map(([name, hours]) => ({ name, hours }))
         .sort((a, b) => b.hours - a.hours)
         .slice(0, 5);
 
       // Monthly trend
       const monthlyData: { [key: string]: number } = {};
-      filteredTimesheets.forEach((t: any) => {
+      filteredTimesheets.forEach((t) => {
         const month = t.clock_in?.substring(0, 7) || 'unknown';
         monthlyData[month] = (monthlyData[month] || 0) + (t.total_hours || 0);
       });
       const monthlyTrend = Object.entries(monthlyData)
-        .map(([month, hours]) => ({ month, hours: hours as number }))
+        .map(([month, hours]) => ({ month, hours }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
       // Store computed data as component state via a single object
@@ -67,14 +71,16 @@ export default function Reports() {
         topEvents,
         monthlyTrend
       });
-    } catch (err: any) {
-      setError(err.message || 'Failed to load report data');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load report data');
     } finally {
       setLoading(false);
     }
   };
 
-  const [computedData, setComputedData] = useState<any>(null);
+  useEffect(() => {
+    fetchReportData();
+  }, [dateRange]);
 
   if (loading) {
     return (
@@ -176,7 +182,7 @@ export default function Reports() {
                 {computedData.topEvents.length === 0 ? (
                   <p className="text-gray-500 text-sm">No data available</p>
                 ) : (
-                  computedData.topEvents.map((event: any, index: number) => (
+                  computedData.topEvents.map((event, index: number) => (
                     <div key={event.name} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-sm">
@@ -197,7 +203,7 @@ export default function Reports() {
                 {computedData.monthlyTrend.length === 0 ? (
                   <p className="text-gray-500 text-sm">No data available</p>
                 ) : (
-                  computedData.monthlyTrend.map((month: any) => (
+                  computedData.monthlyTrend.map((month) => (
                     <div key={month.month} className="flex items-center justify-between">
                       <span className="font-medium text-gray-900">
                         {new Date(month.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -206,7 +212,7 @@ export default function Reports() {
                         <div className="w-32 bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-[#a4c71d] h-2 rounded-full"
-                            style={{ width: `${Math.min((month.hours / Math.max(...computedData.monthlyTrend.map((m: any) => m.hours), 1)) * 100, 100)}%` }}
+                            style={{ width: `${Math.min((month.hours / Math.max(...computedData.monthlyTrend.map((m) => m.hours), 1)) * 100, 100)}%` }}
                           ></div>
                         </div>
                         <span className="font-bold text-gray-900 w-16 text-right">{month.hours.toFixed(1)}h</span>
