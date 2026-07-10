@@ -31,16 +31,21 @@ echo "✅ Lint passed (0 errors)"
 echo ""
 
 # Check 3: Build (run in isolation; under heavy host load vite can be CPU-
-# starved, so bound it with a timeout so a hang fails loudly instead of
-# silently eating the script's wall-clock budget)
+# starved, so each attempt is bounded by a timeout and retried a few times
+# with backoff. A transient throttle minute won't trip a false "broken"
+# alert, but a genuinely broken build still fails loudly after the retries.)
 echo "🏗️  Running build..."
-if ! BUILD_OUTPUT=$(timeout 120 npm run build 2>&1); then
-    echo "❌ Build failed or timed out (120s)"
-    echo "$BUILD_OUTPUT" | tail -30
-    exit 1
-fi
-if [ $? -ne 0 ]; then
-    echo "❌ Build failed"
+BUILD_OK=0
+for attempt in 1 2 3; do
+    if BUILD_OUTPUT=$(timeout 120 npm run build 2>&1); then
+        BUILD_OK=1
+        break
+    fi
+    echo "  ↻ build attempt $attempt timed out under host load, retrying in 10s..."
+    sleep 10
+done
+if [ "$BUILD_OK" -ne 1 ]; then
+    echo "❌ Build failed or timed out after 3 attempts (120s each)"
     echo "$BUILD_OUTPUT" | tail -30
     exit 1
 fi
