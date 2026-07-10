@@ -604,9 +604,18 @@ app.post('/api/notifications/test', authMiddleware, async (req, res) => {
   res.json({ message: 'Test email sent (placeholder)' });
 });
 
-// SPA catch-all
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Serve static assets (JS/CSS/etc.) directly from dist.
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// SPA catch-all (must come after static + API routes).
+// Express 5 (path-to-regexp 8) rejects bare '/*' and '*':
+//   - '/*splat' does NOT match the root path '/', so '/assets/*' would be
+//     swallowed and '/assets/index.js' would return index.html (wrong MIME).
+//   - '/{*splat}' (optional group) matches '/' AND everything beneath it,
+//     which is the correct SPA fallback. sendFile needs the `root` option
+//     (absolute paths 404 with Express 5's bundled `send`).
+app.get('/{*splat}', (req, res) => {
+  res.sendFile('index.html', { root: path.join(__dirname, 'dist') });
 });
 
 app.listen(PORT, () => {
