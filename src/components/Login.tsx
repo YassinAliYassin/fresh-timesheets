@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import API_URL from './api';
+import api from './api';
 import type { AuthUser } from '../types';
 
 export default function Login({ setUser }: { setUser: (user: AuthUser) => void }) {
@@ -23,16 +23,8 @@ export default function Login({ setUser }: { setUser: (user: AuthUser) => void }
     }
 
     try {
-      const endpoint = isLogin ? `${API_URL}/api/login` : `${API_URL}/api/register`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role: 'staff' })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
+      const endpoint = isLogin ? '/api/login' : '/api/register';
+      const data = await api.post<{ token: string; user: AuthUser }>(endpoint, { username, password, role: 'staff' });
 
       localStorage.setItem('token', data.token);
       setUser(data.user);

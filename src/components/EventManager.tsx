@@ -1,4 +1,4 @@
-import API_URL from './api';
+import { API_URL } from './api';
 import { useState, useEffect } from 'react';
 import type { EventItem, EventFormData } from '../types';
 

@@ -1,4 +1,4 @@
-import API_URL from './api';
+import { API_URL } from './api';
 import { useState } from 'react';
 import type { BillingSummaryItem, BillingResponse } from '../types';
 
