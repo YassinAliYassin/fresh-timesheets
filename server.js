@@ -411,11 +411,13 @@ app.post('/api/timesheets/clock-out', authMiddleware, async (req, res) => {
   }
 });
 
-// Get unique event names for previous events
+// Get unique event names for previous events.
+// The timesheets table stores event_id (FK) but no event_name column, so
+// the autocomplete suggestions come from the events table's client_name.
 app.get('/api/events/names', authMiddleware, async (req, res) => {
   try {
-    const names = await dbQuery('SELECT DISTINCT event_name FROM timesheets WHERE event_name IS NOT NULL ORDER BY event_name ASC');
-    res.json(names.map(n => n.event_name));
+    const rows = await dbQuery('SELECT DISTINCT client_name FROM events WHERE client_name IS NOT NULL AND client_name != ? ORDER BY client_name ASC', ['']);
+    res.json(rows.map(r => r.client_name));
   } catch (err) {
     console.error('Get event names error:', err);
     res.status(500).json({ error: 'Internal server error' });
