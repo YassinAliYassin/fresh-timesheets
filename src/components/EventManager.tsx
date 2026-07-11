@@ -1,9 +1,10 @@
-import API_URL from './api';
+import { API_URL } from './api';
 import { useState, useEffect } from 'react';
+import type { EventItem, EventFormData } from '../types';
 
 export default function EventManager() {
-  const [events, setEvents] = useState<any[]>([]);
-  const [formData, setFormData] = useState({
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [formData, setFormData] = useState<EventFormData>({
     client_name: '',
     venue: '',
     address: '',
@@ -16,10 +17,6 @@ export default function EventManager() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -29,10 +26,14 @@ export default function EventManager() {
       if (!res.ok) throw new Error('Failed to fetch events');
       const data = await res.json();
       setEvents(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch events');
     }
   };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,14 +67,14 @@ export default function EventManager() {
       setFormData({ client_name: '', venue: '', address: '', event_date: '', start_time: '', end_time: '' });
       setEditingId(null);
       fetchEvents();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save event');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (event: any) => {
+  const handleEdit = (event: EventItem) => {
     setFormData({
       client_name: event.client_name,
       venue: event.venue,
@@ -99,8 +100,8 @@ export default function EventManager() {
 
       setMessage('✅ Event deleted successfully!');
       fetchEvents();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete event');
     }
   };
 
@@ -224,7 +225,7 @@ export default function EventManager() {
             <p className="text-gray-500 text-center py-8">No events yet</p>
           ) : (
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              {events.map((event: any) => (
+              {events.map((event) => (
                 <div key={event.id} className="border border-gray-200 p-4 rounded-lg hover:shadow-md transition">
                   <div className="flex justify-between items-start mb-2">
                     <div>

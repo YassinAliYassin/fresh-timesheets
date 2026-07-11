@@ -4,11 +4,13 @@ function getToken(): string | null {
   return localStorage.getItem('token');
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<any> {
+type ApiData = Record<string, unknown> | unknown[] | object;
+
+async function request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(options.headers as Record<string, string> | undefined),
   };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -16,17 +18,19 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error || `Request failed: ${res.status}`);
   }
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
 const api = {
-  get: (path: string) => request(path),
-  post: (path: string, data?: any) => request(path, { method: 'POST', body: JSON.stringify(data) }),
-  put: (path: string, data?: any) => request(path, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (path: string) => request(path, { method: 'DELETE' }),
+  get: <T = unknown>(path: string) => request<T>(path),
+  post: <T = unknown>(path: string, data?: ApiData) =>
+    request<T>(path, { method: 'POST', body: data ? JSON.stringify(data) : undefined }),
+  put: <T = unknown>(path: string, data?: ApiData) =>
+    request<T>(path, { method: 'PUT', body: data ? JSON.stringify(data) : undefined }),
+  delete: <T = unknown>(path: string) => request<T>(path, { method: 'DELETE' }),
   get defaults() {
     return { baseURL: API_URL };
   },

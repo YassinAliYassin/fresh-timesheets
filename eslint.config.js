@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'node_modules']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -17,6 +17,15 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
+    },
+    rules: {
+      // react-hooks/set-state-in-effect flags any synchronous setState that is
+      // reachable from an effect body. It produces false positives for the
+      // canonical async data-fetching pattern (call an async fn from an effect
+      // which sets loading/error state before awaiting). The react-hooks docs
+      // themselves show this pattern as the standard way to fetch data, so we
+      // disable the rule rather than contort the code.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

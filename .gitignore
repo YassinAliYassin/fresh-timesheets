@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Runtime SQLite database (local dev data — never commit)
+timesheets.db
+*.db
+*.sqlite
+*.sqlite3
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

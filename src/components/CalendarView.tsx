@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react';
 import api from './api';
+import type { TimesheetRecord } from '../types';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 
 export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [timesheets, setTimesheets] = useState<any[]>([]);
+  const [timesheets, setTimesheets] = useState<TimesheetRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
-  const [dayEntries, setDayEntries] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchTimesheets();
-  }, [currentDate]);
+  const [dayEntries, setDayEntries] = useState<TimesheetRecord[]>([]);
 
   const fetchTimesheets = async () => {
     setLoading(true);
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-      const data = await api.get(`/api/timesheets?month=${month}&year=${year}`);
+      const data = await api.get<TimesheetRecord[]>(`/api/timesheets?month=${month}&year=${year}`);
       setTimesheets(data || []);
     } catch (error) {
       console.error('Failed to fetch timesheets:', error);
@@ -26,6 +23,10 @@ export default function CalendarView() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTimesheets();
+  }, [currentDate]);
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();

@@ -19,18 +19,18 @@ export default function Dashboard() {
     totalBilling: 0
   });
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const fetchStats = async () => {
     try {
-      const data = await api.get('/api/stats');
-      setStats(data);
+      const data = await api.get<Partial<DashboardStats>>('/api/stats');
+      setStats(prev => ({ ...prev, ...data }));
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
   };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const quickActions = [
     { icon: 'fa-calendar', title: 'Events', desc: 'Manage schedules', link: '/events', color: 'bg-green-500' },

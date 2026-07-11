@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import type { AuthUser } from './types';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import EventManager from './components/EventManager';
@@ -11,17 +12,20 @@ import QuotationForm from './components/QuotationForm';
 import TimesheetEntry from './components/TimesheetEntry';
 import useDarkMode from './hooks/useDarkMode';
 
-function App() {
-  const [user, setUser] = useState<any>(null);
-  const { isDark, toggleDarkMode } = useDarkMode();
+function parseTokenUser(token: string): AuthUser | null {
+  try {
+    return JSON.parse(atob(token.split('.')[1])) as AuthUser;
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
+function App() {
+  const [user, setUser] = useState<AuthUser | null>(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUser(payload);
-    }
-  }, []);
+    return token ? parseTokenUser(token) : null;
+  });
+  const { isDark, toggleDarkMode } = useDarkMode();
 
   return (
     <BrowserRouter>

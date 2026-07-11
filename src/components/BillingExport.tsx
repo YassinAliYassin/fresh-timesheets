@@ -1,11 +1,12 @@
-import API_URL from './api';
+import { API_URL } from './api';
 import { useState } from 'react';
+import type { BillingSummaryItem, BillingResponse } from '../types';
 
 export default function BillingExport() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [staffName, setStaffName] = useState('');
-  const [summary, setSummary] = useState<any[]>([]);
+  const [summary, setSummary] = useState<BillingSummaryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [totalAmount, setTotalAmount] = useState(0);
@@ -29,13 +30,13 @@ export default function BillingExport() {
 
       if (!res.ok) throw new Error('Failed to fetch billing data');
 
-      const data = await res.json();
+      const data = await res.json() as BillingResponse;
       setSummary(data.staff || []);
 
-      const total = (data.staff || []).reduce((acc: number, s: any) => acc + (s.total_amount || 0), 0);
+      const total = (data.staff || []).reduce((acc: number, s: BillingSummaryItem) => acc + (s.total_amount || 0), 0);
       setTotalAmount(total);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch billing data');
     } finally {
       setLoading(false);
     }
@@ -63,8 +64,8 @@ export default function BillingExport() {
       a.href = url;
       a.download = `timesheets_${month}_${year}.xlsx`;
       a.click();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Export failed');
     }
   };
 
@@ -143,7 +144,7 @@ export default function BillingExport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {summary.map((s: any, i: number) => (
+                  {summary.map((s: BillingSummaryItem, i: number) => (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="p-3 border-b">{s.staff_name}</td>
                       <td className="p-3 border-b text-right">{s.total_hours}</td>

@@ -411,11 +411,13 @@ app.post('/api/timesheets/clock-out', authMiddleware, async (req, res) => {
   }
 });
 
-// Get unique event names for previous events
+// Get unique event names for previous events.
+// The timesheets table stores event_id (FK) but no event_name column, so
+// the autocomplete suggestions come from the events table's client_name.
 app.get('/api/events/names', authMiddleware, async (req, res) => {
   try {
-    const names = await dbQuery('SELECT DISTINCT event_name FROM timesheets WHERE event_name IS NOT NULL ORDER BY event_name ASC');
-    res.json(names.map(n => n.event_name));
+    const rows = await dbQuery('SELECT DISTINCT client_name FROM events WHERE client_name IS NOT NULL AND client_name != ? ORDER BY client_name ASC', ['']);
+    res.json(rows.map(r => r.client_name));
   } catch (err) {
     console.error('Get event names error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -604,9 +606,18 @@ app.post('/api/notifications/test', authMiddleware, async (req, res) => {
   res.json({ message: 'Test email sent (placeholder)' });
 });
 
-// SPA catch-all
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Serve static assets (JS/CSS/etc.) directly from dist.
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// SPA catch-all (must come after static + API routes).
+// Express 5 (path-to-regexp 8) rejects bare '/*' and '*':
+//   - '/*splat' does NOT match the root path '/', so '/assets/*' would be
+//     swallowed and '/assets/index.js' would return index.html (wrong MIME).
+//   - '/{*splat}' (optional group) matches '/' AND everything beneath it,
+//     which is the correct SPA fallback. sendFile needs the `root` option
+//     (absolute paths 404 with Express 5's bundled `send`).
+app.get('/{*splat}', (req, res) => {
+  res.sendFile('index.html', { root: path.join(__dirname, 'dist') });
 });
 
 app.listen(PORT, () => {
