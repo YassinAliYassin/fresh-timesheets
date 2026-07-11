@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from './api';
 import type { TimesheetRecord, EventItem, ReportComputedData } from '../types';
 
@@ -17,7 +17,7 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [computedData, setComputedData] = useState<ReportComputedData | null>(null);
 
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -76,11 +76,11 @@ export default function Reports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange]);
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange]);
+  }, [fetchReportData]);
 
   if (loading) {
     return (

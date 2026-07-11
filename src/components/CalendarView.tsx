@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from './api';
 import type { TimesheetRecord } from '../types';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
@@ -10,7 +10,7 @@ export default function CalendarView() {
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [dayEntries, setDayEntries] = useState<TimesheetRecord[]>([]);
 
-  const fetchTimesheets = async () => {
+  const fetchTimesheets = useCallback(async () => {
     setLoading(true);
     try {
       const year = currentDate.getFullYear();
@@ -22,11 +22,11 @@ export default function CalendarView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate]);
 
   useEffect(() => {
     fetchTimesheets();
-  }, [currentDate]);
+  }, [fetchTimesheets]);
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
