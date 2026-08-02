@@ -13,7 +13,14 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'fresh-timesheets-secret-2026';
+// JWT signing secret. REQUIRED in production (NODE_ENV=production). In local
+// dev only, a generated fallback is used so the app runs out of the box; never
+// ship a real production secret in the repo.
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const JWT_SECRET =
+  process.env.JWT_SECRET || (NODE_ENV === 'production'
+    ? (() => { throw new Error('JWT_SECRET must be set in production'); })()
+    : 'dev-only-secret-change-me');
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
