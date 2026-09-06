@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible bug
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: To reproduce
+      placeholder: |
+        1. Go to '...'
+        2. Do '...'
+        3. See error
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node version, SQLite or Postgres?
